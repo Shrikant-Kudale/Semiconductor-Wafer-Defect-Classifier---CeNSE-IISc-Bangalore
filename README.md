@@ -4,6 +4,7 @@
 [![IISc Bengaluru](https://img.shields.io/badge/IISc-CeNSE-blue)](https://cense.iisc.ac.in/)
 
 ---
+**Live App:** [https://semiconductor-wafer-defect-classifier-cense-iisc-bangalore.streamlit.app/](https://semiconductor-wafer-defect-classifier-cense-iisc-bangalore.streamlit.app/)
 
 ## 🚀 Project Overview: The Future of Fab Intelligence
 In the high-stakes world of semiconductor manufacturing, the difference between a high-yield production run and a costly failure lies in the ability to detect and diagnose process excursions in real-time. The **WaferFab Intelligence Dashboard** is an industrial-grade machine learning application developed to bridge the gap between complex metrology inspection data and actionable engineering decisions.
