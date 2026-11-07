@@ -1,0 +1,13 @@
+{
+  "name": "waferfab-intelligence",
+  "version": "2.0.0",
+  "description": "Explainable semiconductor wafer defect-pattern diagnostics (XGBoost → JavaScript) for Vercel",
+  "private": true,
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node scripts/serve.js",
+    "test": "node --test tests/engine.test.js",
+    "export": "python scripts/export_model.py && python scripts/build_meta.py"
+  }
+}

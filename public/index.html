@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WaferFab Intelligence — Semiconductor Defect Diagnostics</title>
+<meta name="description" content="Real-time wafer defect-pattern classification with explainable XGBoost (TreeSHAP), what-if analysis, robustness testing and batch scoring — running entirely in your browser. CeNSE, IISc Bengaluru.">
+<meta name="theme-color" content="#6f42c1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/css/style.css">
+<script>
+  // apply saved / system theme before first paint (no flash)
+  (function () {
+    var t = localStorage.getItem("wf-theme");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true">
+      <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6f42c1"/></linearGradient></defs>
+      <circle cx="20" cy="20" r="18" fill="url(#bg)"/>
+      <g fill="#fff" opacity=".9"><rect x="11" y="11" width="4" height="4" rx=".8"/><rect x="17" y="11" width="4" height="4" rx=".8"/><rect x="23" y="11" width="4" height="4" rx=".8"/>
+      <rect x="11" y="17" width="4" height="4" rx=".8"/><rect x="17" y="17" width="4" height="4" rx=".8" opacity=".35"/><rect x="23" y="17" width="4" height="4" rx=".8"/>
+      <rect x="11" y="23" width="4" height="4" rx=".8"/><rect x="17" y="23" width="4" height="4" rx=".8"/><rect x="23" y="23" width="4" height="4" rx=".8"/></g>
+    </svg>
+    <div>
+      <h1>WaferFab <span>Intelligence</span></h1>
+      <p>Explainable defect-pattern diagnostics · CeNSE, IISc Bengaluru</p>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="diagnose" aria-selected="true">Diagnose</button>
+    <button role="tab" data-tab="explain">Explain</button>
+    <button role="tab" data-tab="whatif">What‑if</button>
+    <button role="tab" data-tab="batch">Batch</button>
+    <button role="tab" data-tab="model">Model &amp; API</button>
+  </nav>
+
+  <div class="actions">
+    <span class="chip live" id="engineChip" title="Inference runs locally in your browser — no server round-trip, no cold start"><i></i><span id="latency">loading…</span></span>
+    <button class="icon" id="shareBtn" title="Copy shareable link to this scenario" aria-label="Copy share link">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+    </button>
+    <button class="icon" id="themeBtn" title="Toggle day / night" aria-label="Toggle theme">
+      <svg class="sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="panel" id="controls" aria-label="Metrology inputs">
+    <div class="panel-head">
+      <h2>Metrology inputs</h2>
+      <button class="link" id="resetBtn">Reset</button>
+    </div>
+    <div class="presets-label">Archetype wafers</div>
+    <div class="presets" id="presets"></div>
+    <div id="sliders"></div>
+    <p class="fineprint"><span class="band-key"></span> shaded band = training population (mean ± 3σ). Values far outside it are extrapolations. 🔒 locks a parameter during counterfactual search.</p>
+  </aside>
+
+  <main id="content" tabindex="-1">
+
+    <!-- ============ DIAGNOSE ============ -->
+    <section class="tabpanel" id="tab-diagnose">
+      <div class="grid hero-grid">
+        <div class="col">
+          <article class="card verdict" id="verdictCard">
+            <div class="verdict-top">
+              <div class="ring" id="ring"></div>
+              <div class="verdict-text">
+                <div class="eyebrow">Predicted pattern</div>
+                <div class="verdict-class" id="vClass">—</div>
+                <div class="status" id="vStatus">—</div>
+              </div>
+            </div>
+            <div class="kpis">
+              <div><span>Confidence</span><b id="kConf">—</b></div>
+              <div><span>Margin to #2</span><b id="kMargin">—</b></div>
+              <div><span>Runner‑up</span><b id="kRunner">—</b></div>
+              <div><span>Uncertainty (H)</span><b id="kEnt">—</b></div>
+            </div>
+            <div id="oodBanner" class="banner" hidden></div>
+            <div class="cause" id="causeBox"></div>
+          </article>
+          <article class="card">
+            <div class="card-head"><h3>Class probability distribution</h3><span class="chip" id="probNote">softmax over 9 classes</span></div>
+            <div id="probBars" class="bars"></div>
+          </article>
+        </div>
+        <div class="col">
+          <article class="card wafer">
+            <div class="card-head">
+              <h3>Reconstructed wafer map</h3>
+              <div class="seg" id="mapMode" role="group" aria-label="Map mode">
+                <button data-m="die" class="on">Die map</button><button data-m="scatter">Scatter</button><button data-m="both">Both</button>
+              </div>
+            </div>
+            <div class="wafer-wrap"><canvas id="waferCanvas" aria-label="Schematic wafer map"></canvas></div>
+            <canvas id="radialCanvas" class="radial" aria-label="Radial defect density profile"></canvas>
+            <p class="fineprint">Schematic reconstruction synthesised from the summary statistics (count, radial mean/σ, edge &amp; centre ratios, clusters). Illustrative — not a measured inspection map.</p>
+          </article>
+          <article class="card">
+            <div class="card-head"><h3>Process fingerprint</h3><span class="chip">z‑score vs training population</span></div>
+            <div id="radar" class="radar"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EXPLAIN ============ -->
+    <section class="tabpanel" id="tab-explain" hidden>
+      <div class="grid two wide-left">
+        <article class="card">
+          <div class="card-head">
+            <h3>Why this prediction? <span class="sub">exact TreeSHAP</span></h3>
+            <label class="select">Explain class
+              <select id="shapClass"></select>
+            </label>
+          </div>
+          <p class="lead" id="shapLead"></p>
+          <div id="waterfall"></div>
+          <p class="fineprint">Each bar is a feature's additive contribution to the class log‑odds (margin), computed exactly from the 200 boosted trees of that class (Lundberg et al., 2018). Σφ + base value = model margin.</p>
+        </article>
+        <article class="card">
+          <div class="card-head"><h3>Global feature importance</h3>
+            <div class="seg" id="impKind"><button data-k="gain" class="on">Gain</button><button data-k="cover">Cover</button><button data-k="weight">Splits</button></div>
+          </div>
+          <div id="importance" class="bars"></div>
+          <p class="fineprint">Computed across all trees at export time. <b>Defect density</b> receives zero importance: it is never used in a split.</p>
+        </article>
+      </div>
+      <article class="card">
+        <div class="card-head"><h3>Input profile</h3><span class="chip">current wafer</span></div>
+        <div class="table-wrap"><table class="tbl" id="profileTable"></table></div>
+      </article>
+    </section>
+
+    <!-- ============ WHAT-IF ============ -->
+    <section class="tabpanel" id="tab-whatif" hidden>
+      <article class="card">
+        <div class="card-head">
+          <h3>Sensitivity sweep <span class="sub">one‑at‑a‑time, others held fixed</span></h3>
+          <label class="select">Vary <select id="sweepFeature"></select></label>
+        </div>
+        <div id="sweepChart" class="chart"></div>
+        <div id="sweepLegend" class="legend"></div>
+        <div id="sweepReadout" class="readout"></div>
+      </article>
+
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><h3>Robustness to measurement noise</h3><span class="chip">Monte‑Carlo · n=400</span></div>
+          <label class="range-row">Noise level <b id="mcVal">25%</b> of training σ
+            <input type="range" id="mcNoise" min="0" max="100" value="25">
+          </label>
+          <div id="mcBars" class="bars"></div>
+          <p id="mcSummary" class="lead"></p>
+        </article>
+        <article class="card">
+          <div class="card-head"><h3>Path to a target class <span class="sub">counterfactual search</span></h3>
+            <label class="select">Target <select id="cfTarget"></select></label>
+          </div>
+          <label class="select" style="margin-bottom:10px">Allowed to change
+            <select id="cfScope"><option value="all">All inputs</option><option value="process">Process metrology only</option></select></label>
+          <label class="range-row">Goal probability <b id="cfGoalVal">80%</b>
+            <input type="range" id="cfGoal" min="50" max="99" value="80">
+          </label>
+          <button class="btn" id="cfRun">Find smallest changes</button>
+          <div id="cfOut" class="cf-out"></div>
+          <p class="fineprint">Greedy search over unlocked parameters within slider bounds. These are model associations, not causal process recipes — validate with process engineering before acting.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ BATCH ============ -->
+    <section class="tabpanel" id="tab-batch" hidden>
+      <article class="card">
+        <div class="card-head"><h3>Batch scoring</h3>
+          <div class="btn-row">
+            <button class="btn ghost" id="batchSample">Load demo lot (240 wafers)</button>
+            <button class="btn ghost" id="batchTemplate">Download CSV template</button>
+          </div>
+        </div>
+        <label class="drop" id="drop">
+          <input type="file" id="fileIn" accept=".csv,text/csv,.txt" hidden>
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <b>Drop a CSV here</b> or click to browse
+          <span>Columns: the 15 feature names (any order) or 15 numeric columns in the standard order. Processed locally — data never leaves your device.</span>
+        </label>
+        <div id="batchOut" hidden>
+          <div class="kpis wide" id="batchKpis"></div>
+          <div class="grid two">
+            <div><h4>Class mix</h4><div id="batchBars" class="bars"></div></div>
+            <div><h4>Confidence histogram</h4><div id="batchHist" class="chart small"></div></div>
+          </div>
+          <div class="card-head" style="margin-top:14px"><h4>Results</h4><button class="btn" id="batchDownload">Download results CSV</button></div>
+          <div class="table-wrap tall"><table class="tbl" id="batchTable"></table></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============ MODEL & API ============ -->
+    <section class="tabpanel" id="tab-model" hidden>
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><h3>Model card</h3></div>
+          <dl class="dl" id="modelCard"></dl>
+        </article>
+        <article class="card">
+          <div class="card-head"><h3>Engineering validation</h3></div>
+          <ul class="checks">
+            <li><b>Exact parity</b> with the original Python XGBoost: max |Δp| = 6.6×10⁻⁷ across 69 reference wafers.</li>
+            <li><b>Exact TreeSHAP</b> equals <code>pred_contribs</code> to 1.3×10⁻⁶ (efficiency axiom verified).</li>
+            <li><b>0.05 ms</b> per inference · <b>0.6 ms</b> per explanation (Node 22, single core).</li>
+            <li><b>Zero cold start:</b> static assets + in‑browser inference. Nothing to wake up.</li>
+          </ul>
+          <p class="fineprint">The tests live in <code>tests/engine.test.js</code> and run in CI on every push.</p>
+        </article>
+      </div>
+
+      <article class="card">
+        <div class="card-head"><h3>Defect taxonomy &amp; root causes</h3><span class="chip">WM‑811K‑style 9 classes</span></div>
+        <div class="table-wrap"><table class="tbl" id="taxTable"></table></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h3>REST API</h3><span class="chip">serverless · Node 22</span></div>
+        <p class="lead">The same engine is exposed as Vercel serverless functions. Try it with the current wafer:</p>
+        <pre class="code" id="curlBox"></pre>
+        <div class="btn-row"><button class="btn" id="apiTry">Send to /api/predict</button><button class="btn ghost" id="copyCurl">Copy curl</button><a class="btn ghost" href="/openapi.json" target="_blank" rel="noopener">OpenAPI spec</a></div>
+        <pre class="code out" id="apiOut" hidden></pre>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><h3>Scope &amp; limitations</h3></div>
+        <ul class="checks warn">
+          <li>Trained on <b>simulated</b> wafers (≈5,400 samples, 600/class); results are a proof of concept, not production‑validated.</li>
+          <li>Training features occupy narrow bands (see slider shading). Inputs far outside them are flagged as <i>out‑of‑distribution</i>.</li>
+          <li>The wafer map is a schematic reconstruction from summary statistics, not an inspection image.</li>
+          <li>Counterfactuals describe the model's decision surface, not physical causality.</li>
+        </ul>
+      </article>
+    </section>
+
+    <footer class="foot">
+      Built for the <b>MoTA Foundation Training Program on Semiconductor Fabrication &amp; Characterization</b> · CeNSE, IISc Bengaluru · 8–19 June 2026 ·
+      <a href="https://github.com/Shrikant-Kudale/Semiconductor-Wafer-Defect-Classifier---CeNSE-IISc-Bangalore" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+  </main>
+</div>
+
+<div class="minibar" id="miniBar" role="status" aria-live="polite"><i id="miniDot"></i><b id="miniClass">—</b><span id="miniConf"></span><button id="miniGo">Details ↓</button></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/js/engine.js"></script>
+<script src="/js/charts.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

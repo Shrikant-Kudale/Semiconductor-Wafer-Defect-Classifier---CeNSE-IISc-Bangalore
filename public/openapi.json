@@ -1,0 +1,177 @@
+{
+ "openapi": "3.0.3",
+ "info": {
+  "title": "WaferFab Intelligence API",
+  "version": "2.0.0",
+  "description": "Wafer defect-pattern classification (9 classes) with exact TreeSHAP explanations. Model: XGBoost trained on simulated wafers."
+ },
+ "paths": {
+  "/api/predict": {
+   "post": {
+    "summary": "Classify one wafer or a batch",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "oneOf": [
+         {
+          "type": "object",
+          "properties": {
+           "features": {
+            "oneOf": [
+             {
+              "type": "array",
+              "minItems": 15,
+              "maxItems": 15,
+              "items": {
+               "type": "number"
+              }
+             },
+             {
+              "type": "object",
+              "properties": {
+               "defect_count": {
+                "type": "number",
+                "description": "Total number of failing dies / detected defects on the wafer."
+               },
+               "defect_density": {
+                "type": "number",
+                "description": "Defects per unit wafer area (normalised). Not used by the trained trees \u2014 kept for API compatibility."
+               },
+               "mean_radial_position": {
+                "type": "number",
+                "description": "Mean normalised radius of defects (0 = centre, 1 = edge)."
+               },
+               "std_radial_position": {
+                "type": "number",
+                "description": "Standard deviation of defect radius \u2014 low values indicate ring-like bands."
+               },
+               "edge_ratio": {
+                "type": "number",
+                "description": "Fraction of defects inside the edge-exclusion zone."
+               },
+               "center_ratio": {
+                "type": "number",
+                "description": "Fraction of defects inside the central zone."
+               },
+               "cluster_count": {
+                "type": "number",
+                "description": "Number of spatially connected defect clusters."
+               },
+               "max_cluster_size": {
+                "type": "number",
+                "description": "Size of the largest connected defect cluster."
+               },
+               "oxide_thickness_nm": {
+                "type": "number",
+                "description": "Gate / field oxide thickness from ellipsometry."
+               },
+               "critical_dimension_nm": {
+                "type": "number",
+                "description": "Printed feature width from CD-SEM."
+               },
+               "overlay_error_nm": {
+                "type": "number",
+                "description": "Layer-to-layer registration error from the lithography scanner."
+               },
+               "line_edge_roughness_nm": {
+                "type": "number",
+                "description": "3\u03c3 edge roughness of printed lines."
+               },
+               "etch_uniformity_pct": {
+                "type": "number",
+                "description": "Across-wafer etch-rate uniformity."
+               },
+               "particle_index": {
+                "type": "number",
+                "description": "Particle contamination index from cleanroom / tool monitors."
+               },
+               "wafer_yield_pct": {
+                "type": "number",
+                "description": "Probe-test yield of the wafer."
+               }
+              },
+              "required": [
+               "defect_count",
+               "defect_density",
+               "mean_radial_position",
+               "std_radial_position",
+               "edge_ratio",
+               "center_ratio",
+               "cluster_count",
+               "max_cluster_size",
+               "oxide_thickness_nm",
+               "critical_dimension_nm",
+               "overlay_error_nm",
+               "line_edge_roughness_nm",
+               "etch_uniformity_pct",
+               "particle_index",
+               "wafer_yield_pct"
+              ]
+             }
+            ]
+           },
+           "explain": {
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "features"
+          ]
+         },
+         {
+          "type": "object",
+          "properties": {
+           "batch": {
+            "type": "array",
+            "maxItems": 5000,
+            "items": {
+             "type": "array",
+             "items": {
+              "type": "number"
+             }
+            }
+           }
+          },
+          "required": [
+           "batch"
+          ]
+         }
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Prediction"
+     },
+     "400": {
+      "description": "Validation error"
+     }
+    }
+   }
+  },
+  "/api/model": {
+   "get": {
+    "summary": "Model metadata and feature importances",
+    "responses": {
+     "200": {
+      "description": "OK"
+     }
+    }
+   }
+  },
+  "/api/health": {
+   "get": {
+    "summary": "Liveness probe",
+    "responses": {
+     "200": {
+      "description": "OK"
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,5 @@
+# Only needed to re-export the model / regenerate test vectors (NOT needed on Vercel)
+xgboost
+scikit-learn
+joblib
+numpy
